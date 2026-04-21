@@ -5,16 +5,14 @@ import asyncio
 import edge_tts
 
 # Configuration
-CHOT_TOKEN = os.getenv('BOT_TOKEN')
+BOT_TOKEN = os.getenv('BOT_TOKEN')
 GEMINI_KEY = os.getenv('GEMINI_API_KEY')
 
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash-latest')
-bot = telebot.TeleBot(CHOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN)
 
-# Function bach n-sowbo s-sout (Voiceover)
+# Function bach n-sowbo s-sout
 async def make_voiceover(text, filename):
-    # Khtarina sout "Christopher" hit hwa l-wa3er f l-aswat dyal l-AI fabor
     communicate = edge_tts.Communicate(text, "en-US-ChristopherNeural")
     await communicate.save(filename)
 
@@ -22,34 +20,47 @@ async def make_voiceover(text, filename):
 def handle_script(message):
     topic = message.text.replace('/script', '').strip()
     if not topic:
-        bot.reply_to(message, "Sifet smyt l-mawdo3: /script AI for marketing")
+        bot.reply_to(message, "Sifet mawdo3: /script AI for business")
         return
 
-    msg = bot.reply_to(message, "🧠 AI is thinking & recording voiceover...")
+    status_msg = bot.reply_to(message, "🧠 Generating script and voiceover...")
+
+    # Jereb l-models b tartib hta wahed i-khdem
+    models_to_try = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
+    script_text = None
+
+    for model_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(model_name)
+            prompt = f"Write a 30-second viral TikTok script about {topic}. English only."
+            response = model.generate_content(prompt)
+            script_text = response.text
+            if script_text:
+                break
+        except:
+            continue
+
+    if not script_text:
+        bot.edit_message_text("❌ Model Error. Please check your API Key.", message.chat.id, status_msg.message_id)
+        return
 
     try:
-        # 1. N-sowbo l-script b Gemini
-        prompt = f"Write a 30-second viral TikTok script about {topic}. English only. Focus on professional value."
-        response = model.generate_content(prompt)
-        script_text = response.text
-
-        # 2. N-rddo l-script sout (MP3)
+        # Soweb s-sout
         audio_file = f"voice_{message.chat.id}.mp3"
         asyncio.run(make_voiceover(script_text, audio_file))
 
-        # 3. N-sifto l-script mktoub
-        bot.send_message(message.chat.id, f"📝 **Your Script:**\n\n{script_text}", parse_mode="Markdown")
+        # Sifet l-script
+        bot.send_message(message.chat.id, f"📝 **Script:**\n\n{script_text}", parse_mode="Markdown")
         
-        # 4. N-sifto l-audio
+        # Sifet l-audio
         with open(audio_file, 'rb') as audio:
-            bot.send_voice(message.chat.id, audio, caption="🔊 Professional Voiceover")
+            bot.send_voice(message.chat.id, audio, caption="🔊 AI Voiceover")
         
-        # Mseh l-fichie mlli n-salio bach l-bot ma-i-t3mmerch
         os.remove(audio_file)
-        bot.delete_message(message.chat.id, msg.message_id)
+        bot.delete_message(message.chat.id, status_msg.message_id)
 
     except Exception as e:
-        bot.reply_to(message, f"❌ Erreur: {str(e)}")
+        bot.reply_to(message, f"❌ Voice Error: {str(e)}")
 
-print("Bot is LIVE with Voiceover ability...")
+print("Bot is ACTIVE with 1.5 Flash Support!")
 bot.infinity_polling()
